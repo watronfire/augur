@@ -6,7 +6,7 @@ import numpy as np
 from collections import defaultdict
 import os, sys
 import pandas as pd
-from .io import read_metadata
+from .io.metadata import read_metadata
 from .utils import write_json, get_json_name
 TINY = 1e-12
 
@@ -51,7 +51,7 @@ def mugration_inference(tree=None, seq_meta=None, field='country', confidence=Tr
     traits = {}
     nodes = {n.name:n for n in T.get_terminals()}
     for name, meta in seq_meta.iterrows():
-        if field in meta and name in nodes:
+        if field in meta and name in nodes and meta[field] != missing:
             traits[name] = meta[field]
     unique_states = list(set(traits.values()))
 

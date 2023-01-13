@@ -2,6 +2,74 @@
 
 ## __NEXT__
 
+### Features
+
+* titers: Support parsing of thresholded values (e.g., "<80" or ">2560"). [#1118][] (@huddlej)
+
+### Bug Fixes
+
+* utils: Serialize common numpy data types in `write_json`. [#1119][] (@victorlin)
+
+[#1118]: https://github.com/nextstrain/augur/pull/1118
+[#1119]: https://github.com/nextstrain/augur/pull/1119
+
+## 19.2.0 (19 December 2022)
+
+### Features
+
+* titers: Allow users to specify a custom prefix for attributes in the JSON output (e.g., `cTiter` can be changed to `custom_prefix_cTiter`). [#1106][] (@huddlej)
+
+[#1106]: https://github.com/nextstrain/augur/pull/1106
+
+## 19.1.0 (14 December 2022)
+
+### Features
+
+* io: Add `open_file` and `write_sequences` to the Python Pubic API. [#1114][] (@joverlee521)
+
+[#1114]: https://github.com/nextstrain/augur/pull/1114
+
+## 19.0.0 (13 December 2022)
+
+### Major Changes
+
+* io: Only `read_metadata` and `read_sequences` are available as part of the Python Public API. Other Python API functions of the `augur.io` module are no longer directly available. This is a breaking change, although we suspect few users to be impacted. If you still need to use other imports in your scripts, they can be imported from the [Developer API](https://docs.nextstrain.org/projects/augur/en/stable/api/developer/index.html) but note that they are no longer part of the [Public API](https://docs.nextstrain.org/projects/augur/en/stable/api/public/index.html). [#1087][] (@victorlin)
+
+### Bug Fixes
+
+* docs: Update the API documentation to reflect the latest state of things in the codebase. [#1087][] (@victorlin)
+* Fix support for Biopython version 1.80 which deprecated `Bio.Seq.Seq.ungap()`. [#1102][] (@victorlin)
+* export v2: Fixed a bug where colorings for zero values via `--colors` would not get applied to the exported Auspice JSON. [#1100][] (@joverlee521)
+* curate: Fixed a bug where metadata TSVs failed to parse if data within a column included comma separated values [#1110][] (@joverlee521)
+
+[#1087]: https://github.com/nextstrain/augur/pull/1087
+[#1100]: https://github.com/nextstrain/augur/pull/1100
+[#1102]: https://github.com/nextstrain/augur/pull/1102
+[#1110]: https://github.com/nextstrain/augur/pull/1110
+
+## 18.2.0 (15 November 2022)
+
+### Features
+
+* Add the curate subcommand with two sub-subcommands, passthru and normalize-strings. The curate subcommand is intended to be a suite of commands to help users with data curation prior to running Nextstrain analyses. We will continue to add more subcommands as we identify other common data curation tasks. Please see the [usage docs](https://docs.nextstrain.org/projects/augur/en/stable/usage/cli/curate) for details. [#1039][] (@joverlee521)
+
+[#1039]: https://github.com/nextstrain/augur/pull/1039
+
+## 18.1.2 (1 November 2022)
+
+### Bug Fixes
+
+* traits: Fix trait inference when tips have missing values. [#1081][] (@huddlej)
+
+[#1081]: https://github.com/nextstrain/augur/pull/1081
+
+## 18.1.1 (1 November 2022)
+
+### Bug Fixes
+
+* filter: Fixed a bug where `--group-by week` would fail when all samples in a chunk have been dropped due to ambiguous dates. [#1080][] (@victorlin)
+
+[#1080]: https://github.com/nextstrain/augur/pull/1080
 
 ## 18.1.0 (26 October 2022)
 

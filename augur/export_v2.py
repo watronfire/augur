@@ -11,7 +11,7 @@ import re
 from Bio import Phylo
 
 from .argparse_ import ExtendAction
-from .io import read_metadata
+from .io.metadata import read_metadata
 from .utils import read_node_data, write_json, read_config, read_lat_longs, read_colors
 from .validate import export_v2 as validate_v2, auspice_config_v2 as validate_auspice_config_v2, ValidateError
 
@@ -182,7 +182,7 @@ def update_deprecated_names(name):
 def get_values_across_nodes(node_attrs, key):
     vals = set()
     for data in node_attrs.values():
-        if data.get(key):
+        if is_valid(data.get(key)):
             vals.add(data.get(key))
     return vals
 

@@ -2,6 +2,7 @@ import argparse
 import Bio
 import Bio.Phylo
 import gzip
+import numpy as np
 import os, json, sys
 import pandas as pd
 import subprocess
@@ -12,7 +13,7 @@ from pkg_resources import resource_stream
 from io import TextIOWrapper
 from .__version__ import __version__
 
-from augur.io import open_file
+from augur.io.file import open_file
 
 from augur.util_support.color_parser import ColorParser
 from augur.util_support.node_data_reader import NodeDataReader
@@ -124,7 +125,19 @@ def write_json(data, file_name, indent=(None if os.environ.get("AUGUR_MINIFY_JSO
         data["generated_by"] = {"program": "augur", "version": get_augur_version()}
     with open(file_name, 'w', encoding='utf-8') as handle:
         sort_keys = False if isinstance(data, OrderedDict) else True
-        json.dump(data, handle, indent=indent, sort_keys=sort_keys)
+        json.dump(data, handle, indent=indent, sort_keys=sort_keys, cls=NumpyJSONEncoder)
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """A custom JSONEncoder subclass to serialize additional numpy data types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 
 def load_features(reference, feature_names=None):
