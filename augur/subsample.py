@@ -203,7 +203,7 @@ def generate_calls(config, args, tmpdir):
             output_strains=path.join(tmpdir, f'{sample_name}.samples.txt'),
             # This works when YAML config keys are the same name as the
             # corresponding option class attribute.
-            **sample_config['filter'],
+            **sample_config
         )
 
         if args.subsample_seed is not None:
@@ -212,8 +212,8 @@ def generate_calls(config, args, tmpdir):
             )
 
         # Add sequences only if sequence filters are used.
-        if ('min_length' in sample_config['filter'] or
-            'non_nucleotide' in sample_config['filter']):
+        if ('min_length' in sample_config or
+            'non_nucleotide' in sample_config):
             call.add_options(
                 sequences=args.sequences,
             )

@@ -31,13 +31,11 @@ Subsampling configuration:
   $ cat >config.yaml <<~~
   > samples:
   >   focal:
-  >     filter:
-  >       query: region=='A'
-  >       subsample_max_sequences: 1
+  >     query: region=='A'
+  >     subsample_max_sequences: 1
   >   context:
-  >     filter:
-  >       query: region=='B'
-  >       subsample_max_sequences: 2
+  >     query: region=='B'
+  >     subsample_max_sequences: 2
   > ~~
 
 Apply subsampling.
