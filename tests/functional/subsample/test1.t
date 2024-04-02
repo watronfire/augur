@@ -38,9 +38,6 @@ Subsampling configuration:
   >     filter:
   >       query: region=='B'
   >       subsample_max_sequences: 2
-  > output:
-  >   - focal
-  >   - context
   > ~~
 
 Apply subsampling.

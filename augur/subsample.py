@@ -45,8 +45,6 @@ def parse_config(filename):
     # TODO XXX - write a schema and validate against this
     if 'samples' not in data:
         raise AugurError('Config must define a "samples" key')
-    if 'output' not in data:
-        raise AugurError('Config must define an "output" key')
     return data
 
 # TODO: Move these classes closer to code for augur filter?
@@ -79,10 +77,13 @@ class Filter():
     subsample_seed: Optional[int]
     subsample_max_sequences: Optional[int]
 
-    def __init__(self, name, depends_on):
-        # TODO: move these to a Call class?
+    def __init__(self, name, depends_on=None):
         self.name = name
+
+        if depends_on is None:
+            depends_on = []
         self.depends_on = depends_on
+
         self.status = INCOMPLETE
 
         # Initialize instance attributes.
@@ -174,47 +175,6 @@ class Filter():
 
 
 
-class Proximity():
-    def __init__(self, name, focal_data, contextual_data, num_per_focal, output, depends_on, args, logfile):
-        self.name = name
-        self.focal_data = focal_data
-        self.contextual_data = contextual_data
-        self.num_per_focal = num_per_focal
-        self.output = output
-        self.depends_on = depends_on
-        self.args = args
-        self.logfile = logfile
-        self.status = INCOMPLETE
-
-    def get_closest_sequences(self):
-        """
-        The function we call here (originally written for ncov) computes the minimum
-        hamming distance for every sample in the (background) dataset against
-        all focal strains, and then returns the _n_ closest for each strain
-        """
-        from augur.subsample_.get_distance_to_focal_set import get_distance_to_focal_set 
-        print("Computing hamming distances & choosing closest contextual strains...")
-        # the sequences are assumed to be aligned, an error will be thrown if the lengths vary
-        return get_distance_to_focal_set(
-            self.contextual_data['sequences'],
-            self.args.reference,
-            self.focal_data['sequences'],
-            self.num_per_focal
-        )
-
-    def __str__(self):
-        return f"Calculate proximity for {self.name} by computing weights for {self.focal_data['sequences']} against {self.contextual_data['sequences']}"
-
-    def exec(self, dry_run=False):
-        print("\n" + self.__str__())
-        if not dry_run:
-            closest = self.get_closest_sequences()
-            with open(self.output, 'w') as fh:
-                print("\n".join(list(closest)), file=fh)
-            print(f"\tClosest strains written to {self.output} (n={len(closest)})")
-        self.status = COMPLETE
-
-
 def generate_calls(config, args, tmpdir):
     """
     Produce an (unordered) dictionary of calls to be made to accomplish the
@@ -227,6 +187,7 @@ def generate_calls(config, args, tmpdir):
     """
     calls = {}
 
+    # Add intermediate samples.
     for sample_name, sample_config in config['samples'].items():
         ## TODO XXX
         ## I designed this to have a 'include' parameter whereby the starting meta/seqs for this filter call could
@@ -236,33 +197,10 @@ def generate_calls(config, args, tmpdir):
         if 'include' in sample_config:
             raise AugurError("'include' subsampling functionality not yet implemented")
 
-        depends_on = []
-
-        if 'priorities' in sample_config:
-            priority_type = sample_config['priorities'].get('type', '')
-            focus_name = sample_config['priorities']['focus']
-            if priority_type != 'proximity':
-                raise AugurError(f"Priorities must be proximity, not {priority_type!r}")
-            if sample_config.get('filter', '') != '':
-                raise AugurError(f"Priorities must not be used in conjunction with filtering queries.")
-            priority_fname = path.join(tmpdir, f"{focus_name}.priorities.txt")
-            calls["__priorities__"+focus_name] = Proximity(focus_name,
-                {'sequences': path.join(tmpdir, f"{focus_name}.fasta")},    # input (focal seqs)
-                {'metadata': args.metadata, 'sequences': args.sequences},   # input (contextual seqs)
-                sample_config['priorities']['num_per_focal'],
-                priority_fname,                                             # output         
-                [focus_name],                                               # depends on
-                args,
-                path.join(tmpdir, f"{sample_name}.priorities.log.txt")      # logfile
-            )
-            # FIXME: move command line option names to Filter class
-            sample_config['filter'] = f"--exclude-all --include {priority_fname}"
-            depends_on.append("__priorities__"+focus_name)
-
-        call = Filter(sample_name, depends_on)
+        call = Filter(sample_name)
         call.add_options(
             metadata=args.metadata,
-            output_strains=path.join(tmpdir, sample_name+'.samples.txt'),
+            output_strains=path.join(tmpdir, f'{sample_name}.samples.txt'),
             # This works when YAML config keys are the same name as the
             # corresponding option class attribute.
             **sample_config['filter'],
@@ -282,29 +220,18 @@ def generate_calls(config, args, tmpdir):
 
         calls[sample_name] = call
 
-    # Any intermediate sample a priority calculation depends on requires FASTA input, not samples.txt
-    # (This is required by distance-to-focal-set, but we could change this)
-    for priority_call in [c for c in calls.values() if isinstance(c, Proximity)]:
-        for dep in priority_call.depends_on:
-            print("Priority calc", priority_call.name, "depends on ", dep)
-            calls[dep].data_out['sequences'] = calls[dep].data_out['strains'].replace('.samples.txt', ".fasta")
-
-    output_config = config['output']
-    output_call = Filter('output', output_config)
+    # Combine intermediate samples.
+    output_call = Filter('output', config['samples'].keys())
     output_call.add_options(
         metadata=args.metadata,
         sequences=args.sequences,
         exclude_all=True,
-        include=[path.join(tmpdir, f"{name}.samples.txt") for name in output_config],
+        include=[path.join(tmpdir, f"{sample_name}.samples.txt") for sample_name in config['samples']],
         output_metadata=args.output_metadata,
         output_sequences=args.output_sequences,
     )
     calls['output'] = output_call
-
-    # TODO XXX check acyclic
-        
-    # TODO XXX assert that each dependency of a call is defined as it's own call
-        
+    
     # TODO XXX prune any calls which are not themselves used in 'output' or as a dependency of another call
 
     return calls
