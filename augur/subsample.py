@@ -66,6 +66,7 @@ class Filter():
     output_strains: Optional[File]
 
     query: Optional[PandasQuery]
+    group_by: Optional[List[str]]
     min_date: Optional[Date]
     max_date: Optional[Date]
     exclude: Optional[List[File]]
@@ -74,8 +75,9 @@ class Filter():
     include: Optional[List[File]]
     include_where: Optional[List[EqualityFilterQuery]]
 
-    subsample_seed: Optional[int]
+    sequences_per_group: Optional[int]
     subsample_max_sequences: Optional[int]
+    subsample_seed: Optional[int]
 
     def __init__(self, name, depends_on=None):
         self.name = name
@@ -121,6 +123,10 @@ class Filter():
             args.extend(['--output-strains', self.output_strains])
 
 
+        if self.group_by is not None:
+            args.append('--group-by')
+            args.extend(self.group_by)
+
         if self.query is not None:
             args.extend(['--query', self.query])
 
@@ -136,6 +142,9 @@ class Filter():
 
         # FIXME: Add other options
 
+
+        if self.sequences_per_group is not None:
+            args.extend(['--sequences-per-group', self.sequences_per_group])
 
         if self.subsample_max_sequences is not None:
             args.extend(['--subsample-max-sequences', self.subsample_max_sequences])
