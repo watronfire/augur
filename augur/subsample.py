@@ -150,13 +150,12 @@ class Filter():
         Instead of running an `augur filter` command in a subprocess like we do
         here, a nicer way would be to refactor `augur filter` to expose
         functions which can be called here so that we can get a list of returned
-        strains. Doing so would provide a HUGE speedup if we could load the
-        sequences+metadata into memory a single time and then use that in-memory
-        data for all filtering calls which subsampling performs. This is
-        analogous to having an in-memory database running in a separate process
-        we can query - not as fast, but much easier implementation. Using
-        subprocess does make parallelisation trivial, but the above speed up
-        would be preferable.
+        strains. Doing so would provide a HUGE speedup if we could index the
+        sequences+metadata on disk a single time and then use that for all
+        filtering calls which subsampling performs. This is analogous to having
+        an in-memory database running in a separate process we can query - not
+        as fast, but much easier implementation. Using subprocess does make
+        parallelisation trivial, but the above speed up would be preferable.
         """
         deps = ("depends on " + ", ".join(self.depends_on)) if len(self.depends_on) else "(no dependencies)"
         print(f"RUNNING augur filter with name {self.name!r} {deps}")
