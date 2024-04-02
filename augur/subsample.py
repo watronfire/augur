@@ -197,13 +197,6 @@ def generate_calls(config, args, tmpdir):
 
     # Add intermediate samples.
     for sample_name, sample_config in config['samples'].items():
-        ## TODO XXX
-        ## I designed this to have a 'include' parameter whereby the starting meta/seqs for this filter call could
-        ## be the (joined) output of previous samples. To be implemented.
-        ## Similarly, the "exclude" YAML parameter is also not implemented
-
-        if 'include' in sample_config:
-            raise AugurError("'include' subsampling functionality not yet implemented")
 
         call = Filter(sample_name)
         call.add_options(
