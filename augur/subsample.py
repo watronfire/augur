@@ -5,7 +5,7 @@ This augur functionality is _alpha_ and may change at any time.
 It does not conform to the semver release standards used by Augur.
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from .errors import AugurError
 from os import path
 import subprocess
@@ -28,7 +28,7 @@ def register_parser(parent_subparsers):
     optionals.add_argument('--dry-run', action="store_true")
     optionals.add_argument('--metadata-id-columns', metavar="NAME", nargs="+",
         help="names of possible metadata columns containing identifier information, ordered by priority. Only one ID column will be inferred.")
-    optionals.add_argument('--subsample-seed', type=int, metavar="N",
+    optionals.add_argument('--random-seed', type=int, metavar="N",
         help="random number generator seed to allow reproducible subsampling (with same input data).")
     optionals.add_argument('--reference', metavar="FASTA", help="needed for priority calculation (but it shouldn't be!)")
 
@@ -75,9 +75,12 @@ class Filter():
     include: Optional[List[File]]
     include_where: Optional[List[EqualityFilterQuery]]
 
-    sequences_per_group: Optional[int]
-    subsample_max_sequences: Optional[int]
-    subsample_seed: Optional[int]
+    seq_per_group: Optional[int]
+    max_sequences: Optional[int]
+    disable_probabilistic_sampling: Optional[bool]
+    random_seed: Optional[int]
+
+    priorities: Optional[Any]
 
     def __init__(self, name, depends_on=None):
         self.name = name
@@ -143,14 +146,22 @@ class Filter():
         # FIXME: Add other options
 
 
-        if self.sequences_per_group is not None:
-            args.extend(['--sequences-per-group', self.sequences_per_group])
+        if self.seq_per_group is not None:
+            args.extend(['--sequences-per-group', self.seq_per_group])
 
-        if self.subsample_max_sequences is not None:
-            args.extend(['--subsample-max-sequences', self.subsample_max_sequences])
+        if self.max_sequences is not None:
+            args.extend(['--subsample-max-sequences', self.max_sequences])
 
-        if self.subsample_seed is not None:
-            args.extend(['--subsample-seed', self.subsample_seed])
+        if self.disable_probabilistic_sampling:
+            args.append('--no-probabilistic-sampling')
+
+        if self.random_seed is not None:
+            args.extend(['--subsample-seed', self.random_seed])
+
+
+        if self.priorities is not None:
+            # TODO: implement proximity-based sampling
+            pass
 
         return args
 
@@ -166,11 +177,13 @@ class Filter():
         as fast, but much easier implementation. Using subprocess does make
         parallelisation trivial, but the above speed up would be preferable.
         """
-        deps = ("depends on " + ", ".join(self.depends_on)) if len(self.depends_on) else "(no dependencies)"
-        print(f"RUNNING augur filter with name {self.name!r} {deps}")
+        deps = (f"depends on {', '.join(self.depends_on)}") if self.depends_on else "no dependencies"
+        print(f"Sampling for {self.name!r} ({deps})")
         for option in self.__annotations__:
             if self.__getattribute__(option):
                 print(f'\t{option}: {self.__getattribute__(option)}')
+        print()
+        print(' '.join(str(arg) for arg in self.args()))
         print()
 
         if not dry_run:
@@ -207,9 +220,9 @@ def generate_calls(config, args, tmpdir):
             **sample_config
         )
 
-        if args.subsample_seed is not None:
+        if args.random_seed is not None:
             call.add_options(
-                subsample_seed=args.subsample_seed,
+                random_seed=args.random_seed,
             )
 
         # Add sequences only if sequence filters are used.
@@ -234,6 +247,8 @@ def generate_calls(config, args, tmpdir):
     calls['output'] = output_call
     
     # TODO XXX prune any calls which are not themselves used in 'output' or as a dependency of another call
+
+    # TODO XXX top-level includes
 
     return calls
 
@@ -261,6 +276,7 @@ def loop(calls, dry_run):
     solution however.
     """
     while name:=get_runnable_call(calls):
+        # FIXME: exit early if one fails
         calls[name].exec(dry_run)
 
 def run(args):
