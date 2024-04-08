@@ -31,6 +31,7 @@ def register_parser(parent_subparsers):
     optionals.add_argument('--random-seed', type=int, metavar="N",
         help="random number generator seed to allow reproducible subsampling (with same input data).")
     optionals.add_argument('--reference', metavar="FASTA", help="needed for priority calculation (but it shouldn't be!)")
+    optionals.add_argument('--include', type=str, nargs="+", help="file(s) with list of strains to include regardless of priorities, subsampling, or absence of an entry in --sequences.")
 
     return parser
 
@@ -235,12 +236,19 @@ def generate_calls(config, args, tmpdir):
         calls[sample_name] = call
 
     # Combine intermediate samples.
+    include = [path.join(tmpdir, f"{sample_name}.samples.txt") for sample_name in config['samples']]
+    # TODO: Also read include from config file? I suspect workflows will need it
+    # to be defined in workflow-level config for both filter and subsample step,
+    # so maybe best to only allow from command line for now.
+    if args.include:
+        include.extend(args.include)
+
     output_call = Filter('output', config['samples'].keys())
     output_call.add_options(
         metadata=args.metadata,
         sequences=args.sequences,
         exclude_all=True,
-        include=[path.join(tmpdir, f"{sample_name}.samples.txt") for sample_name in config['samples']],
+        include=include,
         output_metadata=args.output_metadata,
         output_sequences=args.output_sequences,
     )
