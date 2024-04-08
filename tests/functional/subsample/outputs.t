@@ -32,21 +32,23 @@ Subsampling configuration:
   > samples:
   >   focal:
   >     query: region=='A'
-  >     subsample_max_sequences: 1
+  >     max_sequences: 1
   >   context:
   >     query: region=='B'
-  >     subsample_max_sequences: 2
+  >     max_sequences: 2
   > ~~
 
 Apply subsampling.
 
+FIXME: Use better regex to ignore temp file paths but still show other relevant info.
+
   $ ${AUGUR} subsample \
-  >  --config config.yaml \
   >  --metadata metadata.tsv \
   >  --sequences sequences.fasta \
+  >  --config config.yaml \
   >  --output-metadata subsampled-metadata.tsv \
   >  --output-sequences subsampled-sequences.fasta \
-  >  --subsample-seed 0
+  >  --random-seed 0
   4 strains were dropped during filtering
   	3 were filtered out by the query: "region=='A'"
   	1 was dropped because of subsampling criteria
@@ -60,25 +62,31 @@ Apply subsampling.
   .* (re)
   .* (re)
   3 strains passed all filters
-  RUNNING augur filter with name 'focal' (no dependencies)
+  Sampling for 'focal' (no dependencies)
   	metadata: metadata.tsv
   .* (re)
   	query: region=='A'
-  	subsample_max_sequences: 1
+  	max_sequences: 1
   
-  RUNNING augur filter with name 'context' (no dependencies)
-  	metadata: metadata.tsv
-  .* (re)
-  	query: region=='B'
-  	subsample_max_sequences: 2
+  augur filter .* (re)
   
-  RUNNING augur filter with name 'output' depends on focal, context
-  	metadata: metadata.tsv
-  	sequences: sequences.fasta
-  	output_metadata: subsampled-metadata.tsv
-  	output_sequences: subsampled-sequences.fasta
-  	exclude_all: True
   .* (re)
+  \tmetadata: metadata.tsv (esc)
+  .* (re)
+  \tquery: region=='B' (esc)
+  \tmax_sequences: 2 (esc)
+  
+  augur filter .* (re)
+  
+  Sampling for 'output' (depends on focal, context)
+  \tmetadata: metadata.tsv (esc)
+  \tsequences: sequences.fasta (esc)
+  \toutput_metadata: subsampled-metadata.tsv (esc)
+  .* (re)
+  \texclude_all: True (esc)
+  .* (re)
+  
+  augur filter .* (re)
   
 
   $ cat subsampled-metadata.tsv
