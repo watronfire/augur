@@ -63,28 +63,20 @@ FIXME: Use better regex to ignore temp file paths but still show other relevant 
   .* (re)
   3 strains passed all filters
   Sampling for 'focal' (no dependencies)
-  	metadata: metadata.tsv
-  .* (re)
   	query: region=='A'
   	max_sequences: 1
   
   augur filter .* (re)
   
-  .* (re)
-  \tmetadata: metadata.tsv (esc)
-  .* (re)
-  \tquery: region=='B' (esc)
-  \tmax_sequences: 2 (esc)
+  Sampling for 'context' (no dependencies)
+  	query: region=='B'
+  	max_sequences: 2
   
   augur filter .* (re)
   
   Sampling for 'output' (depends on focal, context)
-  \tmetadata: metadata.tsv (esc)
-  \tsequences: sequences.fasta (esc)
-  \toutput_metadata: subsampled-metadata.tsv (esc)
-  .* (re)
   \texclude_all: True (esc)
-  .* (re)
+  .*include:.* (re)
   
   augur filter .* (re)
   

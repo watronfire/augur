@@ -55,17 +55,7 @@ File = str
 EqualityFilterQuery = str
 
 
-class Filter():
-
-    # This is not optional but marking it as such for easier implementation.
-    metadata: Optional[File]
-    sequences: Optional[File]
-    metadata_id_columns: Optional[List[str]]
-
-    output_metadata: Optional[File]
-    output_sequences: Optional[File]
-    output_strains: Optional[File]
-
+class Sample:
     query: Optional[PandasQuery]
     group_by: Optional[List[str]]
     min_date: Optional[Date]
@@ -83,7 +73,37 @@ class Filter():
 
     priorities: Optional[Any]
 
+    def __init__(self):
+        # Initialize instance attributes.
+        for option in self.__annotations__.keys():
+            self.__setattr__(option, None)
+
+    def add_options(self, **kwargs):
+        for option, value in kwargs.items():
+            if option not in self.__annotations__:
+                raise AugurError(f'Option {option!r} not allowed.')
+            # TODO: Check types
+            self.__setattr__(option, value)
+
+
+class FilterCall:
+
+    # This is not optional but marking it as such for easier implementation.
+    metadata: Optional[File]
+    sequences: Optional[File]
+    metadata_id_columns: Optional[List[str]]
+
+    output_metadata: Optional[File]
+    output_sequences: Optional[File]
+    output_strains: Optional[File]
+
+    sample: Sample
+
     def __init__(self, name, depends_on=None):
+        # Initialize instance attributes.
+        for option in self.__annotations__.keys():
+            self.__setattr__(option, None)
+
         self.name = name
 
         if depends_on is None:
@@ -92,9 +112,7 @@ class Filter():
 
         self.status = INCOMPLETE
 
-        # Initialize instance attributes.
-        for option in self.__annotations__.keys():
-            self.__setattr__(option, None)
+        self.sample = Sample()
 
     def add_options(self, **kwargs):
         for option, value in kwargs.items():
@@ -127,40 +145,40 @@ class Filter():
             args.extend(['--output-strains', self.output_strains])
 
 
-        if self.group_by is not None:
+        if self.sample.group_by is not None:
             args.append('--group-by')
-            args.extend(self.group_by)
+            args.extend(self.sample.group_by)
 
-        if self.query is not None:
-            args.extend(['--query', self.query])
+        if self.sample.query is not None:
+            args.extend(['--query', self.sample.query])
 
-        if self.min_date is not None:
-            args.extend(['--min-date', self.min_date])
+        if self.sample.min_date is not None:
+            args.extend(['--min-date', self.sample.min_date])
 
-        if self.exclude_all is not None and self.exclude_all:
+        if self.sample.exclude_all is not None and self.sample.exclude_all:
             args.append('--exclude-all')
 
-        if self.include is not None:
+        if self.sample.include is not None:
             args.append('--include')
-            args.extend(self.include)
+            args.extend(self.sample.include)
 
         # FIXME: Add other options
 
 
-        if self.seq_per_group is not None:
-            args.extend(['--sequences-per-group', self.seq_per_group])
+        if self.sample.seq_per_group is not None:
+            args.extend(['--sequences-per-group', self.sample.seq_per_group])
 
-        if self.max_sequences is not None:
-            args.extend(['--subsample-max-sequences', self.max_sequences])
+        if self.sample.max_sequences is not None:
+            args.extend(['--subsample-max-sequences', self.sample.max_sequences])
 
-        if self.disable_probabilistic_sampling:
+        if self.sample.disable_probabilistic_sampling:
             args.append('--no-probabilistic-sampling')
 
-        if self.random_seed is not None:
-            args.extend(['--subsample-seed', self.random_seed])
+        if self.sample.random_seed is not None:
+            args.extend(['--subsample-seed', self.sample.random_seed])
 
 
-        if self.priorities is not None:
+        if self.sample.priorities is not None:
             # TODO: implement proximity-based sampling
             pass
 
@@ -180,9 +198,9 @@ class Filter():
         """
         deps = (f"depends on {', '.join(self.depends_on)}") if self.depends_on else "no dependencies"
         print(f"Sampling for {self.name!r} ({deps})")
-        for option in self.__annotations__:
-            if self.__getattribute__(option):
-                print(f'\t{option}: {self.__getattribute__(option)}')
+        for option in self.sample.__annotations__:
+            if self.sample.__getattribute__(option):
+                print(f'\t{option}: {self.sample.__getattribute__(option)}')
         print()
         print(' '.join(str(arg) for arg in self.args()))
         print()
@@ -212,25 +230,26 @@ def generate_calls(config, args, tmpdir):
     # Add intermediate samples.
     for sample_name, sample_config in config['samples'].items():
 
-        call = Filter(sample_name)
+        call = FilterCall(sample_name)
         call.add_options(
             metadata=args.metadata,
             output_strains=path.join(tmpdir, f'{sample_name}.samples.txt'),
-            # This works when YAML config keys are the same name as the
-            # corresponding option class attribute.
-            **sample_config
         )
-
-        if args.random_seed is not None:
-            call.add_options(
-                random_seed=args.random_seed,
-            )
 
         # Add sequences only if sequence filters are used.
         if ('min_length' in sample_config or
             'non_nucleotide' in sample_config):
             call.add_options(
                 sequences=args.sequences,
+            )
+
+        # This works when YAML config keys are the same name as the
+        # corresponding option class attribute.    
+        call.sample.add_options(**sample_config)
+
+        if args.random_seed is not None:
+            call.sample.add_options(
+                random_seed=args.random_seed,
             )
 
         calls[sample_name] = call
@@ -243,14 +262,16 @@ def generate_calls(config, args, tmpdir):
     if args.include:
         include.extend(args.include)
 
-    output_call = Filter('output', config['samples'].keys())
+    output_call = FilterCall('output', config['samples'].keys())
     output_call.add_options(
         metadata=args.metadata,
         sequences=args.sequences,
-        exclude_all=True,
-        include=include,
         output_metadata=args.output_metadata,
         output_sequences=args.output_sequences,
+    )
+    output_call.sample.add_options(
+        exclude_all=True,
+        include=include,
     )
     calls['output'] = output_call
     
