@@ -10,6 +10,7 @@ from .errors import AugurError
 from os import path
 import subprocess
 import tempfile
+import yaml
 
 INCOMPLETE = 'incomplete'
 COMPLETE = 'complete'
@@ -35,18 +36,6 @@ def register_parser(parent_subparsers):
 
     return parser
 
-def parse_config(filename):
-    import yaml
-    with open(filename) as fh:
-        try:
-            data = yaml.safe_load(fh)
-        except yaml.YAMLError as e:
-            print(e)
-            raise AugurError(f"Error parsing subsampling scheme {filename}")
-    # TODO XXX - write a schema and validate against this
-    if 'samples' not in data:
-        raise AugurError('Config must define a "samples" key')
-    return data
 
 # TODO: Move these classes closer to code for augur filter?
 PandasQuery = str
@@ -65,15 +54,20 @@ class Sample:
     exclude_all: Optional[bool]
     include: Optional[List[File]]
     include_where: Optional[List[EqualityFilterQuery]]
+    min_length: Optional[str]
+    non_nucleotide: Optional[bool]
 
-    seq_per_group: Optional[int]
+    weight: Optional[int]
     max_sequences: Optional[int]
     disable_probabilistic_sampling: Optional[bool]
     random_seed: Optional[int]
 
     priorities: Optional[Any]
 
-    def __init__(self):
+    def __init__(self, name: str):
+        # TODO: figure out where to put name. currently comes from config but is used for depends_on
+        self.name = name
+
         # Initialize instance attributes.
         for option in self.__annotations__.keys():
             self.__setattr__(option, None)
@@ -100,19 +94,17 @@ class FilterCall:
     sample: Sample
 
     def __init__(self, name, depends_on=None):
+        self.name = name
+
         # Initialize instance attributes.
         for option in self.__annotations__.keys():
             self.__setattr__(option, None)
-
-        self.name = name
 
         if depends_on is None:
             depends_on = []
         self.depends_on = depends_on
 
         self.status = INCOMPLETE
-
-        self.sample = Sample()
 
     def add_options(self, **kwargs):
         for option, value in kwargs.items():
@@ -165,10 +157,7 @@ class FilterCall:
         # FIXME: Add other options
 
 
-        if self.sample.seq_per_group is not None:
-            args.extend(['--sequences-per-group', self.sample.seq_per_group])
-
-        if self.sample.max_sequences is not None:
+        if self.sample.weight is not None:
             args.extend(['--subsample-max-sequences', self.sample.max_sequences])
 
         if self.sample.disable_probabilistic_sampling:
@@ -214,72 +203,119 @@ class FilterCall:
         self.status = COMPLETE
 
 
+class Config:
+    size: int
+    samples: Optional[List[Sample]]
 
-def generate_calls(config, args, tmpdir):
-    """
-    Produce an (unordered) dictionary of calls to be made to accomplish the
-    desired subsampling. Each call is either (i) a use of augur filter or (ii) a
-    proximity calculation The names given to calls are config-defined, but there
-    is guaranteed to be one call with the name "output".
+    def __init__(self):
+        # Initialize instance attributes.
+        for option in self.__annotations__.keys():
+            self.__setattr__(option, None)
 
-    The separation between this function and the Filter (etc) classes is not
-    quite right, but it's a WIP.
-    """
-    calls = {}
+        self.samples = []
 
-    # Add intermediate samples.
-    for sample_name, sample_config in config['samples'].items():
+    def load_yaml(self, filename):
+        with open(filename) as fh:
+            try:
+                data = yaml.safe_load(fh)
+            except yaml.YAMLError as e:
+                print(e)
+                raise AugurError(f"Error parsing subsampling scheme {filename}")
+        # TODO XXX - write a schema and validate against this
+        if 'samples' not in data:
+            raise AugurError('Config must define a "samples" key')
 
-        call = FilterCall(sample_name)
-        call.add_options(
-            metadata=args.metadata,
-            output_strains=path.join(tmpdir, f'{sample_name}.samples.txt'),
-        )
+        self.size = data['size']
+        for sample_name, sample_dict in data['samples'].items():
+            sample = Sample(sample_name)
+            sample.add_options(**sample_dict)
+            self.samples.append(sample)
 
-        # Add sequences only if sequence filters are used.
-        if ('min_length' in sample_config or
-            'non_nucleotide' in sample_config):
+    def add(self, new_sample: Sample):
+        if any(new_sample.name == sample.name for sample in self.samples):
+            raise Exception(f"ERROR: A sample with the name {new_sample.name} already exists.")
+
+        self.samples.append(new_sample)
+
+    def compute_max_sequences(self):
+        total_weights = sum(sample.weight for sample in self.samples)
+
+        for sample in self.samples:
+            sample.max_sequences = int(self.size * (sample.weight / total_weights))
+
+    def get_filter_calls(self, args, tmpdir):
+        """
+        Produce an (unordered) dictionary of calls to be made to accomplish the
+        desired subsampling. Each call is either (i) a use of augur filter or (ii) a
+        proximity calculation The names given to calls are config-defined, but there
+        is guaranteed to be one call with the name "output".
+
+        The separation between this function and the Filter (etc) classes is not
+        quite right, but it's a WIP.
+        """
+        calls = {}
+
+        # Add intermediate samples.
+        for sample in self.samples:
+
+            call = FilterCall(sample.name)
             call.add_options(
-                sequences=args.sequences,
+                metadata=args.metadata,
+                output_strains=path.join(tmpdir, f'{sample.name}.samples.txt'),
             )
 
-        # This works when YAML config keys are the same name as the
-        # corresponding option class attribute.    
-        call.sample.add_options(**sample_config)
+            # Add sequences only if sequence filters are used.
+            if ( sample.__getattribute__('min_length') or
+                sample.__getattribute__('non_nucleotide')):
+                call.add_options(
+                    sequences=args.sequences,
+                )
 
-        if args.random_seed is not None:
-            call.sample.add_options(
-                random_seed=args.random_seed,
-            )
+            # This works when YAML config keys are the same name as the
+            # corresponding option class attribute.    
+            call.sample = sample
 
-        calls[sample_name] = call
+            if args.random_seed is not None:
+                call.sample.add_options(
+                    random_seed=args.random_seed,
+                )
 
-    # Combine intermediate samples.
-    include = [path.join(tmpdir, f"{sample_name}.samples.txt") for sample_name in config['samples']]
-    # TODO: Also read include from config file? I suspect workflows will need it
-    # to be defined in workflow-level config for both filter and subsample step,
-    # so maybe best to only allow from command line for now.
-    if args.include:
-        include.extend(args.include)
+            calls[sample.name] = call
 
-    output_call = FilterCall('output', config['samples'].keys())
-    output_call.add_options(
-        metadata=args.metadata,
-        sequences=args.sequences,
-        output_metadata=args.output_metadata,
-        output_sequences=args.output_sequences,
-    )
-    output_call.sample.add_options(
-        exclude_all=True,
-        include=include,
-    )
-    calls['output'] = output_call
+        # Combine intermediate samples.
+        include = [path.join(tmpdir, f"{sample.name}.samples.txt") for sample in self.samples]
+        # TODO: Also read include from config file? I suspect workflows will need it
+        # to be defined in workflow-level config for both filter and subsample step,
+        # so maybe best to only allow from command line for now.
+        if args.include:
+            include.extend(args.include)
+
+        output_call = FilterCall('output', [sample.name for sample in self.samples])
+        output_call.add_options(
+            metadata=args.metadata,
+            sequences=args.sequences,
+            output_metadata=args.output_metadata,
+            output_sequences=args.output_sequences,
+        )
+        # FIXME: the separate object exposed here is unnecessary complexity
+        output_call.sample = Sample('output')
+        output_call.sample.add_options(
+            exclude_all=True,
+            include=include,
+        )
+        calls['output'] = output_call
+        
+        # TODO XXX prune any calls which are not themselves used in 'output' or as a dependency of another call
+
+        # TODO XXX top-level includes
+
+        return calls
     
-    # TODO XXX prune any calls which are not themselves used in 'output' or as a dependency of another call
-
-    # TODO XXX top-level includes
-
-    return calls
+    def run(self, args):
+        self.compute_max_sequences()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            calls = self.get_filter_calls(args, tmpdir)
+            loop(calls, args.dry_run)
 
 
 def get_runnable_call(calls):
@@ -309,7 +345,6 @@ def loop(calls, dry_run):
         calls[name].exec(dry_run)
 
 def run(args):
-    config = parse_config(args.config)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        calls = generate_calls(config, args, tmpdir)
-        loop(calls, args.dry_run)
+    config = Config()
+    config.load_yaml(args.config)
+    config.run(args)

@@ -29,13 +29,14 @@ Write data files.
 Subsampling configuration:
 
   $ cat >config.yaml <<~~
+  > size: 3
   > samples:
   >   focal:
   >     query: region=='A'
-  >     max_sequences: 1
+  >     weight: 1
   >   context:
   >     query: region=='B'
-  >     max_sequences: 2
+  >     weight: 2
   > ~~
 
 Apply subsampling.
@@ -64,18 +65,20 @@ FIXME: Use better regex to ignore temp file paths but still show other relevant 
   3 strains passed all filters
   Sampling for 'focal' (no dependencies)
   	query: region=='A'
+  	weight: 1
   	max_sequences: 1
   
   augur filter .* (re)
   
   Sampling for 'context' (no dependencies)
   	query: region=='B'
+  	weight: 2
   	max_sequences: 2
   
   augur filter .* (re)
   
   Sampling for 'output' (depends on focal, context)
-  \texclude_all: True (esc)
+  	exclude_all: True
   .*include:.* (re)
   
   augur filter .* (re)
