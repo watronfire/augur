@@ -20,6 +20,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      python-packages:
-        patterns:
-          - "*"
+      dev-deps:
+        dependency-type: "development"
+      prod-deps:
+        dependency-type: "production"
