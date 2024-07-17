@@ -40,7 +40,7 @@ Build a tree, augmenting existing default arguments with custom arguments.
   $ ${AUGUR} tree \
   >  --method iqtree \
   >  --alignment tree/aligned.fasta \
-  >  --tree-builder-args="-czb" \
+  >  --tree-builder-args="--polytomy" \
   >  --output "$TMP/tree_raw.nwk" > /dev/null
 
 Build a tree, replacing existing default arguments with custom arguments.
@@ -49,7 +49,7 @@ Since the following custom arguments are incompatible with the default IQ-TREE a
   $ ${AUGUR} tree \
   >  --method iqtree \
   >  --alignment tree/full_aligned.fasta \
-  >  --tree-builder-args="-czb -bb 1000 -bnni -redo" \
+  >  --tree-builder-args="--polytomy -bb 1000 -bnni --redo" \
   >  --override-default-args \
   >  --output "$TMP/tree_raw.nwk" > /dev/null
 
