@@ -49,7 +49,7 @@ Since the following custom arguments are incompatible with the default IQ-TREE a
   $ ${AUGUR} tree \
   >  --method iqtree \
   >  --alignment tree/full_aligned.fasta \
-  >  --tree-builder-args="-czb -bb 1000 -bnni" \
+  >  --tree-builder-args="-czb -bb 1000 -bnni -redo" \
   >  --override-default-args \
   >  --output "$TMP/tree_raw.nwk" > /dev/null
 
