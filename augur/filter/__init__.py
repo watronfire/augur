@@ -88,10 +88,11 @@ def register_arguments(parser):
         (1) Any ``--group-by`` columns absent from this file will be given equal
             weighting across all values *within* groups defined by the other
             weighted columns.
-        (2) All combinations of weighted column values that are present in the
-            metadata must be included in this file. Absence from this file will
-            cause augur filter to exit with an error describing how to add the
-            weights explicitly.
+        (2) An entry with the value ``default`` under all columns will be
+            treated as the default weight for specific groups present in the
+            metadata but missing from the weights file. If there is no default
+            weight and the metadata contains rows that are not covered by the
+            given weights, augur filter will exit with an error.
     """)
     subsample_group.add_argument('--priority', type=str, help="""tab-delimited file with list of priority scores for strains (e.g., "<strain>\\t<priority>") and no header.
     When scores are provided, Augur converts scores to floating point values, sorts strains within each subsampling group from highest to lowest priority, and selects the top N strains per group where N is the calculated or requested number of strains per group.
@@ -104,11 +105,6 @@ def register_arguments(parser):
     output_group.add_argument('--output-metadata', help="metadata for strains that passed filters")
     output_group.add_argument('--output-strains', help="list of strains that passed filters (no header)")
     output_group.add_argument('--output-log', help="tab-delimited file with one row for each filtered strain and the reason it was filtered. Keyword arguments used for a given filter are reported in JSON format in a `kwargs` column.")
-    output_group.add_argument('--output-group-by-missing-weights', type=str, metavar="FILE", help="""
-        TSV file formatted for --group-by-weights with an empty weight column.
-        Represents groups with entries in --metadata but absent from
-        --group-by-weights.
-    """)
     output_group.add_argument('--output-group-by-sizes', help="tab-delimited file one row per group with target size.")
     output_group.add_argument(
         '--empty-output-reporting',

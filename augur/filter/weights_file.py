@@ -1,9 +1,11 @@
 import pandas as pd
 from textwrap import dedent
+from typing import List
 from augur.errors import AugurError
 
 
 WEIGHTS_COLUMN = 'weight'
+COLUMN_VALUE_FOR_DEFAULT_WEIGHT = 'default'
 
 
 class InvalidWeightsFile(AugurError):
@@ -42,3 +44,12 @@ def get_weighted_columns(weights_file):
         raise InvalidWeightsFile(weights_file, "File is empty.")
     columns.remove(WEIGHTS_COLUMN)
     return columns
+
+
+def get_default_weight(weights: pd.DataFrame, weighted_columns: List[str]):
+    default_weight_values = weights[(weights[weighted_columns] == COLUMN_VALUE_FOR_DEFAULT_WEIGHT).all(axis=1)][WEIGHTS_COLUMN].unique()
+
+    if len(default_weight_values) > 1:
+        raise InvalidWeightsFile(f"Multiple default weights were specified: {', '.join(repr(weight) for weight in default_weight_values)}. Only one default weight entry can be accepted.")
+    if len(default_weight_values) == 1:
+        return default_weight_values[0]

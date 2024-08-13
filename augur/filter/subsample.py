@@ -12,7 +12,7 @@ from augur.errors import AugurError
 from augur.io.metadata import METADATA_DATE_COLUMN
 from augur.io.print import print_err
 from . import constants
-from .weights_file import WEIGHTS_COLUMN, get_weighted_columns, read_weights_file
+from .weights_file import WEIGHTS_COLUMN, COLUMN_VALUE_FOR_DEFAULT_WEIGHT, get_default_weight, get_weighted_columns, read_weights_file
 
 Group = Tuple[str, ...]
 """Combinations of grouping column values in tuple form."""
@@ -315,7 +315,6 @@ def get_weighted_group_sizes(
         group_by: List[str],
         weights_file: str,
         target_total_size: int,
-        output_missing_weights: Optional[str],
         output_sizes_file: Optional[str],
         random_seed: Optional[int],
     ) -> Dict[Group, int]:
@@ -336,16 +335,16 @@ def get_weighted_group_sizes(
         # weights to ensure equal weighting of unweighted columns *within* each
         # weighted group defined by the weighted columns.
         weights = _add_unweighted_columns(weights, groups, group_by, unweighted_columns)
+
+        weights = _handle_incomplete_weights(weights, weights_file, weighted_columns, group_by, groups)
         weights = _drop_unused_groups(weights, groups, group_by)
+
         weights = _adjust_weights_for_unweighted_columns(weights, weighted_columns, unweighted_columns)
     else:
+        weights = _handle_incomplete_weights(weights, weights_file, weighted_columns, group_by, groups)
         weights = _drop_unused_groups(weights, groups, group_by)
 
     weights = _calculate_weighted_group_sizes(weights, target_total_size, random_seed)
-
-    missing_groups = set(groups) - set(weights[group_by].apply(tuple, axis=1))
-    if missing_groups:
-        weights = _handle_incomplete_weights(weights, weights_file, weighted_columns, group_by, missing_groups, output_missing_weights)
 
     # Add columns to summarize the input data
     weights[INPUT_SIZE_COLUMN] = weights.apply(lambda row: records_per_group[tuple(row[group_by].values)], axis=1)
@@ -462,11 +461,15 @@ def _handle_incomplete_weights(
         weights_file: str,
         weighted_columns: List[str],
         group_by: List[str],
-        missing_groups: Collection[Group],
-        output_missing_weights: Optional[str],
+        groups: Iterable[Group],
     ) -> pd.DataFrame:
     """Handle the case where the weights file does not cover all rows in the metadata.
     """
+    missing_groups = set(groups) - set(weights[group_by].apply(tuple, axis=1))
+
+    if not missing_groups:
+        return weights
+
     # Collect the column values that are missing weights.
     missing_values_by_column = defaultdict(set)
     for group in missing_groups:
@@ -478,27 +481,26 @@ def _handle_incomplete_weights(
         for column in weighted_columns:
             missing_values_by_column[column].add(column_to_value_map[column])
 
-    columns_with_values = '\n            - '.join(f'{column!r}: {list(values)}' for column, values in missing_values_by_column.items())
-    if not output_missing_weights:
+    columns_with_values = '\n            - '.join(f'{column!r}: {list(sorted(values))}' for column, values in sorted(missing_values_by_column.items()))
+
+    default_weight = get_default_weight(weights, weighted_columns)
+
+    if not default_weight:
         raise AugurError(dedent(f"""\
             The input metadata contains these values under the following columns that are not covered by {weights_file!r}:
             - {columns_with_values}
-            Re-run with --output-group-by-missing-weights to continue."""))
+            To fix this, either:
+            (1) specify weights explicitly - add entries to {weights_file!r} for the values above, or
+            (2) specify a default weight - add an entry to {weights_file!r} with the value {COLUMN_VALUE_FOR_DEFAULT_WEIGHT!r} for all columns"""))
     else:
-        missing_weights = pd.DataFrame(sorted(missing_groups), columns=group_by)
-        missing_weights_weighted_columns_only = missing_weights[weighted_columns].drop_duplicates()
-        missing_weights_weighted_columns_only[WEIGHTS_COLUMN] = ''
-        missing_weights_weighted_columns_only.to_csv(output_missing_weights, index=False, sep='\t')
         print_err(dedent(f"""\
-            The input metadata contains these values under the following columns that are not covered by {weights_file!r}:
+            WARNING: The input metadata contains these values under the following columns that are not directly covered by {weights_file!r}:
             - {columns_with_values}
-            Sequences associated with these values will be dropped.
-            A separate weights file has been generated with implicit weight of zero for these values: {output_missing_weights!r}
-            Consider updating {weights_file!r} with nonzero weights and re-running without --output-group-by-missing-weights."""))
+            The default weight of {default_weight!r} will be used for all groups defined by those values."""))
 
-        # Set the weight for these groups to zero, effectively dropping all sequences.
-        missing_weights[TARGET_SIZE_COLUMN] = 0
-        return pd.merge(weights, missing_weights, on=[*group_by, TARGET_SIZE_COLUMN], how='outer')
+        missing_weights = pd.DataFrame(sorted(missing_groups), columns=group_by)
+        missing_weights[WEIGHTS_COLUMN] = default_weight
+        return pd.merge(weights, missing_weights, on=[*group_by, WEIGHTS_COLUMN], how='outer')
 
 
 def create_queues_by_group(max_sizes_per_group):

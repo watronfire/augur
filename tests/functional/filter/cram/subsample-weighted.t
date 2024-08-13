@@ -89,10 +89,18 @@ Sampling with incomplete weights should show an error.
   Sampling with weights defined by weights.tsv.
   ERROR: The input metadata contains these values under the following columns that are not covered by 'weights.tsv':
   - 'location': ['B']
-  Re-run with --output-group-by-missing-weights to continue.
+  To fix this, either:
+  (1) specify weights explicitly - add entries to 'weights.tsv' for the values above, or
+  (2) specify a default weight - add an entry to 'weights.tsv' with the value 'default' for all columns
   [2]
 
-Re-running with --output-group-by-missing-weights shows a warning and a file to use for fixing.
+Re-running with a default weight shows a warning and continues.
+
+  $ cat >weights.tsv <<~~
+  > location	weight
+  > A	2
+  > default	1
+  > ~~
 
   $ ${AUGUR} filter \
   >   --metadata metadata.tsv \
@@ -100,23 +108,65 @@ Re-running with --output-group-by-missing-weights shows a warning and a file to 
   >   --group-by-weights weights.tsv \
   >   --subsample-max-sequences 6 \
   >   --subsample-seed 0 \
-  >   --output-group-by-missing-weights missing-weights.tsv \
   >   --output-strains strains.txt
   Sampling with weights defined by weights.tsv.
-  NOTE: Skipping 1 group due to lack of entries in metadata.
-  NOTE: Weights were not provided for the column 'month'. Using equal weights across values in that column.
-  The input metadata contains these values under the following columns that are not covered by 'weights.tsv':
+  WARNING: The input metadata contains these values under the following columns that are not directly covered by 'weights.tsv':
   - 'location': ['B']
-  Sequences associated with these values will be dropped.
-  A separate weights file has been generated with implicit weight of zero for these values: 'missing-weights.tsv'
-  Consider updating 'weights.tsv' with nonzero weights and re-running without --output-group-by-missing-weights.
-  4 strains were dropped during filtering
-  	4 were dropped because of subsampling criteria
-  4 strains passed all filters
+  The default weight of 1 will be used for all groups defined by those values.
+  NOTE: Skipping 4 groups due to lack of entries in metadata.
+  NOTE: Weights were not provided for the column 'month'. Using equal weights across values in that column.
+  2 strains were dropped during filtering
+  	2 were dropped because of subsampling criteria
+  6 strains passed all filters
 
-  $ cat missing-weights.tsv
-  location	weight
-  B	
+To specify a default weight, the value 'default' must be set for all weighted columns.
+
+  $ cat >weights.tsv <<~~
+  > location	month	weight
+  > A	2000-01	2
+  > A	2000-02	2
+  > default		1
+  > ~~
+
+  $ ${AUGUR} filter \
+  >   --metadata metadata.tsv \
+  >   --group-by month location \
+  >   --group-by-weights weights.tsv \
+  >   --subsample-max-sequences 6 \
+  >   --subsample-seed 0 \
+  >   --output-strains strains.txt
+  Sampling with weights defined by weights.tsv.
+  ERROR: The input metadata contains these values under the following columns that are not covered by 'weights.tsv':
+  - 'location': ['B']
+  - 'month': ['2000-01', '2000-03']
+  To fix this, either:
+  (1) specify weights explicitly - add entries to 'weights.tsv' for the values above, or
+  (2) specify a default weight - add an entry to 'weights.tsv' with the value 'default' for all columns
+  [2]
+
+  $ cat >weights.tsv <<~~
+  > location	month	weight
+  > A	2000-01	2
+  > A	2000-02	2
+  > default	default	1
+  > ~~
+
+  $ ${AUGUR} filter \
+  >   --metadata metadata.tsv \
+  >   --group-by month location \
+  >   --group-by-weights weights.tsv \
+  >   --subsample-max-sequences 6 \
+  >   --subsample-seed 0 \
+  >   --output-strains strains.txt
+  Sampling with weights defined by weights.tsv.
+  WARNING: The input metadata contains these values under the following columns that are not directly covered by 'weights.tsv':
+  - 'location': ['B']
+  - 'month': ['2000-01', '2000-03']
+  The default weight of 1 will be used for all groups defined by those values.
+  NOTE: Skipping 1 group due to lack of entries in metadata.
+  2 strains were dropped during filtering
+  	2 were dropped because of subsampling criteria
+  6 strains passed all filters
 
 When --group-by-weights is specified, all columns must be provided in
 --group-by.
