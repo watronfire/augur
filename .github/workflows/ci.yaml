@@ -51,6 +51,10 @@ jobs:
       COVERAGE_FILE: ${{ github.workspace }}/.coverage@python=${{ matrix.python-version }},biopython=${{ matrix.biopython-version || 'latest' }}
       COVERAGE_RCFILE: ${{ github.workspace }}/.coveragerc
     steps:
+    - uses: nextstrain/.github/actions/setup-debugger@master
+      with:
+        tailscale-auth-key: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
     - uses: actions/checkout@v4
 
     - name: Set cache key
