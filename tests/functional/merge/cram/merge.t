@@ -79,6 +79,26 @@ Supports --metadata-id-columns.
   two    X2a  X2b  Y2c  Y2f  Y2e  Y2d                    1                    1
   three                 Y3f  Y3e  Y3d                    0                    1
 
+Supports table-specific --metadata-id-columns.
+
+  $ ${AUGUR} merge \
+  >   --metadata X=x-id-column.tsv Y=y.tsv \
+  >   --metadata-id-columns X=id \
+  >   --output-metadata - --quiet | csv2tsv --csv-delim $'\t' | tsv-pretty
+  id     a    b    c    f    e    d    __source_metadata_X  __source_metadata_Y
+  one    X1a  X1b  X1c                                   1                    0
+  two    X2a  X2b  Y2c  Y2f  Y2e  Y2d                    1                    1
+  three                 Y3f  Y3e  Y3d                    0                    1
+
+  $ ${AUGUR} merge \
+  >   --metadata X=x.tsv Y=y-name-column.tsv \
+  >   --metadata-id-columns strain Y=name \
+  >   --output-metadata - --quiet | csv2tsv --csv-delim $'\t' | tsv-pretty
+  strain  a    b    c    f    e    d    __source_metadata_X  __source_metadata_Y
+  one     X1a  X1b  X1c                                   1                    0
+  two     X2a  X2b  Y2c  Y2f  Y2e  Y2d                    1                    1
+  three                  Y3f  Y3e  Y3d                    0                    1
+
 Supports Augur's standard delimiter detection.
 
   $ sed 's/\t/,/g' < x.tsv > x.csv
@@ -96,6 +116,26 @@ Supports --metadata-delimiters.
   $ ${AUGUR} merge \
   >   --metadata X=x.txt Y=y.tsv \
   >   --metadata-delimiters '|' $'\t' \
+  >   --output-metadata - --quiet | csv2tsv --csv-delim $'\t' | tsv-pretty
+  strain  a    b    c    f    e    d    __source_metadata_X  __source_metadata_Y
+  one     X1a  X1b  X1c                                   1                    0
+  two     X2a  X2b  Y2c  Y2f  Y2e  Y2d                    1                    1
+  three                  Y3f  Y3e  Y3d                    0                    1
+
+Supports table-specific --metadata-delimiters.
+
+  $ ${AUGUR} merge \
+  >   --metadata X=x.txt Y=y.tsv \
+  >   --metadata-delimiters X='|' \
+  >   --output-metadata - --quiet | csv2tsv --csv-delim $'\t' | tsv-pretty
+  strain  a    b    c    f    e    d    __source_metadata_X  __source_metadata_Y
+  one     X1a  X1b  X1c                                   1                    0
+  two     X2a  X2b  Y2c  Y2f  Y2e  Y2d                    1                    1
+  three                  Y3f  Y3e  Y3d                    0                    1
+
+  $ ${AUGUR} merge \
+  >   --metadata X=x.txt Y=y.tsv \
+  >   --metadata-delimiters $'\t' X='|' \
   >   --output-metadata - --quiet | csv2tsv --csv-delim $'\t' | tsv-pretty
   strain  a    b    c    f    e    d    __source_metadata_X  __source_metadata_Y
   one     X1a  X1b  X1c                                   1                    0
