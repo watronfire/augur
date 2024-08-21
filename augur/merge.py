@@ -13,7 +13,9 @@ Columns are combined by name, either extending the combined table with a new
 column or overwriting values in an existing column.  For columns appearing in
 more than one table, non-empty values on the right hand side overwrite values
 on the left hand side.  The first table's id column name is used as the output
-id column name.
+id column name.  Non-id columns in other input tables that would conflict with
+this output id column name are prefixed with two underscores ("__") in the
+output table.
 
 One generated column per input table is appended to the end of the output
 table to identify the source of each row's data.  Column names are generated
@@ -186,7 +188,24 @@ def run(args):
             for column in m.columns:
                 # Match different id column names in different metadata files
                 # since they're logically equivalent.
-                output_column = output_id_column if column == m.id_column else column
+                if column == m.id_column:
+                    output_column = output_id_column
+
+                # Don't overwrite output id column (i.e. first table's id
+                # column) with a non-id column of the same name (i.e. from a
+                # subsequent table).
+                #
+                # XXX TODO: Alternatively, we could a) skip such columns rather
+                # than mangle their names, or b) allow for output columns with
+                # non-unique names (i.e. distinguishable only by position).
+                # Would either of those be preferrable?  Should it be
+                # configurable?
+                #   -trs, 21 Aug 2024
+                elif column == output_id_column:
+                    output_column = f"__{column}"
+                    print_info(f"WARNING: Renaming column in {m.name!r} from {column!r} to {output_column!r} because it conflicts with the output id column name ({output_id_column!r}).")
+                else:
+                    output_column = column
 
                 output_columns.setdefault(output_column, [])
                 output_columns[output_column] += [(m.table_name, column)]

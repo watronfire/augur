@@ -143,6 +143,27 @@ Metadata field values with metachars (field or record delimiters) are handled pr
   x"	1	1
   two	X2a	X2b	X2c				1	1
 
+Output column renamed when it conflicts with id column.
+
+  $ cat >id-and-strain.csv <<~~
+  > id,strain
+  > one,1
+  > two,2
+  > three,3
+  > ~~
+  $ ${AUGUR} merge \
+  >   --metadata strain-only=x.tsv id-and-strain=id-and-strain.csv \
+  >   --metadata-id-columns id strain \
+  >   --output-metadata - | csv2tsv --csv-delim $'\t' | tsv-pretty
+  Reading 'strain-only' metadata from 'x.tsv'…
+  Reading 'id-and-strain' metadata from 'id-and-strain.csv'…
+  WARNING: Renaming column in 'id-and-strain' from 'strain' to '__strain' because it conflicts with the output id column name ('strain').
+  Merging metadata and writing to '-'…
+  strain  a    b    c    __strain  __source_metadata_strain-only  __source_metadata_id-and-strain
+  one     X1a  X1b  X1c         1                              1                                1
+  two     X2a  X2b  X2c         2                              1                                1
+  three                         3                              0                                1
+
 
 ERROR HANDLING
 
