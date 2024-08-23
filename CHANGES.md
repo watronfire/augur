@@ -2,6 +2,12 @@
 
 ## __NEXT__
 
+### Bug Fixes
+
+* filter: Previously, when `--subsample-max-sequences` was slightly lower than the number of groups, it was possible to fail with an uncaught `AssertionError`. Internal calculations have been adjusted to prevent this from happening. [#1588][] [#1598][] (@victorlin)
+
+[#1588]: https://github.com/nextstrain/augur/issues/1588
+[#1598]: https://github.com/nextstrain/augur/issues/1598
 
 ## 25.3.0 (22 August 2024)
 
